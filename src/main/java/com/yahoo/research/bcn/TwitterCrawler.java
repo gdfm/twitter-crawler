@@ -33,12 +33,21 @@ public class TwitterCrawler {
             while (crawler.hasNextUser()) {
                 crawler.nextUser();
                 System.out.println("Crawling friends of user " + crawler.getCurrentUserID());
-                boolean ok = true;
+                boolean done = false;
                 do {
-                    ok = crawler.crawlNextFriends();
-                    // System.out.println("Retrying crawling friend page " + crawler.currentFriends.getNextCursor() + " of " + crawler.getCurrentUserID());
+                    while (!done && crawler.retry()) {
+                        try {
+                            done = crawler.crawlNextFriends();
+                        } catch (TwitterException e) {
+                            if (e.exceededRateLimitation()) {
+                                crawler.handleRateLimit(e);
+                            } else {
+                                crawler.handleTwitterException(e);
+                            }
+                        }
+                    }
                 } while (crawler.hasMorePages() && crawler.retry());
-                if (!ok) {
+                if (!done) {
                     System.out.println("Could not access friends of " + crawler.getCurrentUserID());
                 }
             }
@@ -73,18 +82,8 @@ public class TwitterCrawler {
     }
 
     // true = ok, false = exception
-    public boolean crawlNextFriends() {
-        try {
-            this.currentFriends = twitter.getFriendsIDs(getCurrentUserID(), currentCursor);
-        } catch (TwitterException e) {
-            if (e.exceededRateLimitation()) {
-                handleRateLimit(e);
-                return true;
-            } else {
-                handleTwitterException(e);
-                return false;
-            }
-        }
+    public boolean crawlNextFriends() throws TwitterException {
+        this.currentFriends = twitter.getFriendsIDs(getCurrentUserID(), currentCursor);
         for (long friendID : currentFriends.getIDs())
             writer.println(String.format("%d\t%d", getCurrentUserID(), friendID));
         writer.flush();
@@ -147,6 +146,7 @@ public class TwitterCrawler {
         currentFriends = null;
         currentCursor = CursorSupport.START;
         consecutiveErrors = 0; // reset retry counter
+        retry = true;
         writer.flush();
     }
 

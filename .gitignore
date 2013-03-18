@@ -3,3 +3,4 @@ src/main/resources/twitter4j.properties
 .classpath
 .project
 .settings
+sync.sh
