@@ -33,17 +33,14 @@ public class TwitterCrawler {
             while (crawler.hasNextUser()) {
                 crawler.nextUser();
                 System.out.println("Crawling friends of user " + crawler.getCurrentUserID());
-                boolean done = false;
+                boolean done;
                 do {
+                    done = false;
                     while (!done && crawler.retry()) {
                         try {
                             done = crawler.crawlNextFriends();
                         } catch (TwitterException e) {
-                            if (e.exceededRateLimitation()) {
-                                crawler.handleRateLimit(e);
-                            } else {
-                                crawler.handleTwitterException(e);
-                            }
+                            crawler.handleTwitterException(e);
                         }
                     }
                 } while (crawler.hasMorePages() && crawler.retry());
@@ -96,26 +93,25 @@ public class TwitterCrawler {
         return currentUserID;
     }
 
-    // wait if it is caused by rate limit
-    private void handleRateLimit(TwitterException e) {
-        logException(e);
-        int secondsToSleep = e.getRateLimitStatus().getSecondsUntilReset() + 1; // 1s slack
-        int millisToSleep = 1000 * secondsToSleep;
-        System.out.println("[" + new Date() + "] Sleeping for " + secondsToSleep + " seconds");
-        long before = System.currentTimeMillis();
-        try {
-            Thread.sleep(millisToSleep);
-        } catch (InterruptedException ie) {
-            ie.printStackTrace();
-        }
-        long now = System.currentTimeMillis();
-        System.out.println("[" + new Date() + "] Woke up! Slept for " + (now - before) / 1000 + " seconds");
-    }
-
     private void handleTwitterException(TwitterException e) {
-        logException(e);
-        if (consecutiveErrors++ > MAX_RETRIES)
-            setRetry(false); // already tried enough
+        if (e.exceededRateLimitation()) {
+            logException(e);
+            int secondsToSleep = e.getRateLimitStatus().getSecondsUntilReset() + 1; // 1s slack
+            int millisToSleep = 1000 * secondsToSleep;
+            System.out.println("[" + new Date() + "] Sleeping for " + secondsToSleep + " seconds");
+            long before = System.currentTimeMillis();
+            try {
+                Thread.sleep(millisToSleep);
+            } catch (InterruptedException ie) {
+                ie.printStackTrace();
+            }
+            long now = System.currentTimeMillis();
+            System.out.println("[" + new Date() + "] Woke up! Slept for " + (now - before) / 1000 + " seconds");
+        } else {
+            logException(e);
+            if (consecutiveErrors++ > MAX_RETRIES)
+                setRetry(false); // already tried enough
+        }
     }
 
     public boolean hasMorePages() {
@@ -145,16 +141,21 @@ public class TwitterCrawler {
             nextUserID = Long.parseLong(line);
         currentFriends = null;
         currentCursor = CursorSupport.START;
-        consecutiveErrors = 0; // reset retry counter
-        retry = true;
+        resetRetry();
         writer.flush();
     }
 
-    public boolean retry() {
+    private boolean retry() {
         return retry;
     }
 
-    public void setRetry(boolean retry) {
+    private void setRetry(boolean retry) {
         this.retry = retry;
     }
+
+    private void resetRetry() {
+        consecutiveErrors = 0; // reset retry counter
+        retry = true;
+    }
+
 }
