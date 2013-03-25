@@ -115,7 +115,7 @@ public class TwitterCrawler {
     }
 
     public boolean hasMorePages() {
-        return currentFriends.hasNext();
+        return (currentFriends != null && currentFriends.hasNext());
     }
 
     public boolean hasNextUser() throws IOException {
