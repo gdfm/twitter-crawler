@@ -15,7 +15,7 @@ import twitter4j.TwitterException;
 public class TwitterCrawlerTest {
     private static final String USER_ID = "234017215";
 
-    @Test
+//    @Test
     public void test() throws IOException, TwitterException {
         StringWriter sw = new StringWriter();
         BufferedReader in = new BufferedReader(new StringReader(USER_ID));
